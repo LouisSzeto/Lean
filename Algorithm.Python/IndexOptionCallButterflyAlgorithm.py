@@ -28,9 +28,9 @@ class IndexOptionCallButterflyAlgorithm(QCAlgorithm):
         option = self.AddIndexOption(index, "SPXW", Resolution.Minute)
         option.SetFilter(lambda x: x.IncludeWeeklys().Strikes(-3, 3).Expiration(15, 45))
 
-        self.option = option.Symbol
+        self.spxw = option.Symbol
         self.multiplier = option.SymbolProperties.ContractMultiplier
-        self.legs = []
+        self.tickets = []
 
     def OnData(self, slice: Slice) -> None:
         # The order of magnitude per SPXW order's value is 10000 times of VXZ
@@ -38,10 +38,10 @@ class IndexOptionCallButterflyAlgorithm(QCAlgorithm):
             self.MarketOrder(self.vxz, 10000)
         
         # Return if any opening index option position
-        if any([self.Portfolio[x.Symbol].Invested for x in self.legs]): return
+        if any([self.Portfolio[x.Symbol].Invested for x in self.tickets]): return
 
         # Get the OptionChain
-        chain = slice.OptionChains.get(self.option)
+        chain = slice.OptionChains.get(self.spxw)
         if not chain: return
 
         # Get nearest expiry date
@@ -55,13 +55,10 @@ class IndexOptionCallButterflyAlgorithm(QCAlgorithm):
         # Select ATM call
         atm_call = sorted(calls, key=lambda x: abs(x.Strike - chain.Underlying.Value))[0]
 
-        # Create combo order legs
-        self.legs = [
-            Leg.Create(sorted_calls[0].Symbol, -1),
-            Leg.Create(sorted_calls[-1].Symbol, -1),
-            Leg.Create(atm_call.Symbol, 2)
-        ]
-        price = sum([abs(self.Securities[x.Symbol].Price * x.Quantity) * self.multiplier for x in self.legs])
+        # Buy the call butterfly
+        call_butterfly = OptionStrategies.CallButterfly(self.spxw, sorted_calls[-1].Strike, atm_call.Strike, sorted_calls[0].Strike, expiry)
+        price = sum([abs(self.Securities[x.Symbol].Price * x.Quantity) * self.multiplier for x in call_butterfly.OptionLegs])
         if price > 0:
             quantity = self.Portfolio.TotalPortfolioValue // price
-            self.ComboMarketOrder(self.legs, -quantity, asynchronous=True)
+            self.tickets = self.Buy(call_butterfly, quantity, asynchronous=True)
+        

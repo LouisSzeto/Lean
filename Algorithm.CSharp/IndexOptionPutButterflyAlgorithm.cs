@@ -18,6 +18,7 @@ using System.Linq;
 using System.Collections.Generic;
 using QuantConnect.Data;
 using QuantConnect.Orders;
+using QuantConnect.Securities.Option;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -25,7 +26,7 @@ namespace QuantConnect.Algorithm.CSharp
     {
         private Symbol _spxw, _vxz;
         private decimal _multiplier;
-        private List<Leg> _legs = new();
+        private IEnumerable<OrderTicket> _tickets = Enumerable.Empty<OrderTicket>();
 
         public override void Initialize()
         {
@@ -52,7 +53,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
             
             // Return if any opening index option position
-            if (_legs.Any(x => Portfolio[x.Symbol].Invested)) return;
+            if (_tickets.Any(x => Portfolio[x.Symbol].Invested)) return;
 
             // Get the OptionChain
             if (!slice.OptionChains.TryGetValue(_spxw, out var chain)) return;
@@ -68,18 +69,13 @@ namespace QuantConnect.Algorithm.CSharp
             // Select ATM put
             var atmPut = puts.MinBy(x => Math.Abs(x.Strike - chain.Underlying.Value));
 
-            // Create combo order legs
-            _legs = new List<Leg>
-            {
-                Leg.Create(sortedPuts[0].Symbol, -1),
-                Leg.Create(sortedPuts[^1].Symbol, -1),
-                Leg.Create(atmPut.Symbol, 2)
-            };
-            var price = _legs.Sum(x => Math.Abs(Securities[x.Symbol].Price * x.Quantity) * _multiplier);
+            // Buy the put butterfly
+            var putButterfly = OptionStrategies.PutButterfly(_spxw, sortedPuts[^1].Strike, atmPut.Strike, sortedPuts[0].Strike, expiry);
+            var price = putButterfly.OptionLegs.Sum(x => Math.Abs(Securities[x.Symbol].Price * x.Quantity) * _multiplier);
             if (price > 0)
             {
                 var quantity = Portfolio.TotalPortfolioValue / price;
-                ComboMarketOrder(_legs, -(int)Math.Floor(quantity), asynchronous: true);
+                _tickets = Buy(putButterfly, (int)Math.Floor(quantity), asynchronous: true);
             }
             
         }
