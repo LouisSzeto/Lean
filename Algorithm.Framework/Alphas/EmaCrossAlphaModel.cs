@@ -103,6 +103,12 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         {
             foreach (var added in changes.AddedSecurities)
             {
+                // Ignore non-asset data type
+                if (added.Symbol.SecurityType == SecurityType.Base && added.Symbol.ID.Symbol.TryGetCustomDataType(out var type))
+                {
+                    continue;
+                }
+
                 SymbolData symbolData;
                 if (!SymbolDataBySymbol.TryGetValue(added.Symbol, out symbolData))
                 {
