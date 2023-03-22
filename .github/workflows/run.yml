@@ -14,4 +14,4 @@ jobs:
         run: dotnet build /p:Configuration=Release /v:quiet /p:WarningLevel=1 QuantConnect.Lean.sln
 
       - name: Run
-        run: dotnet run ./Launcher/bin/debug/net6.0/process.dll
+        run: dotnet run ./Launcher/bin/debug/QuantConnect.Lean.Launcher.dll
