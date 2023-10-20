@@ -15,14 +15,16 @@
 
 using NUnit.Framework;
 using QuantConnect.Algorithm;
+using QuantConnect.Algorithm.Framework.Alphas;
 using QuantConnect.Data;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Lean.Engine.HistoricalData;
 using QuantConnect.Orders;
 using QuantConnect.Orders.Slippage;
-using QuantConnect.Securities.Equity;
+using QuantConnect.Securities;
 using QuantConnect.Tests.Engine.DataFeeds;
 using System;
+using System.Collections.Generic;
 
 namespace QuantConnect.Tests.Common.Orders.Slippage
 {
@@ -31,8 +33,7 @@ namespace QuantConnect.Tests.Common.Orders.Slippage
     {
         private QCAlgorithm _algorithm;
         private MarketImpactSlippageModel _slippageModel;
-        private Equity _liquidEquity;
-        private Equity _illiquidEquity;
+        private List<Security> _securities;
 
         [SetUp]
         public void Initialize()
@@ -41,70 +42,133 @@ namespace QuantConnect.Tests.Common.Orders.Slippage
             _algorithm.SubscriptionManager.SetDataManager(new DataManagerStub(_algorithm));
 
             var historyProvider = new SubscriptionDataReaderHistoryProvider();
-            using var cacheProvider = new ZipDataCacheProvider(TestGlobals.DataProvider);
             historyProvider.Initialize(new HistoryProviderInitializeParameters(null, null,
-                TestGlobals.DataProvider, cacheProvider, TestGlobals.MapFileProvider, TestGlobals.FactorFileProvider,
+                TestGlobals.DataProvider, TestGlobals.DataCacheProvider, TestGlobals.MapFileProvider, TestGlobals.FactorFileProvider,
                 null, true, new DataPermissionManager(), _algorithm.ObjectStore));
             _algorithm.SetHistoryProvider(historyProvider);
 
-            _algorithm.SetDateTime(new DateTime(2013, 10, 11, 15, 0, 0));
-            _liquidEquity = _algorithm.AddEquity("SPY");
-            _illiquidEquity = _algorithm.AddEquity("WM");
+            var optionContract = Symbol.CreateOption(Symbols.GOOG, Market.USA,
+                OptionStyle.American, OptionRight.Call, 740, new DateTime(2015, 12, 24));
+
+            _algorithm.SetDateTime(new DateTime(2015, 12, 23, 15, 0, 0));
+            _securities = new List<Security>
+            {
+                _algorithm.AddEquity("SPY", Resolution.Daily),
+                _algorithm.AddEquity("WM", Resolution.Daily),
+                _algorithm.AddForex("EURUSD", Resolution.Daily),
+                _algorithm.AddForex("GBPUSD", Resolution.Daily),
+                _algorithm.AddCrypto("BTCUSD", Resolution.Daily, Market.GDAX),
+                _algorithm.AddOptionContract(optionContract)
+            };
 
             _algorithm.EnableAutomaticIndicatorWarmUp = true;
 
             _slippageModel = new MarketImpactSlippageModel(_algorithm);
         }
 
-        [Test]
-        public void SizeSlippageComparisonTests()
+        // Test on buy & sell orders
+        [TestCase(InsightDirection.Up)]
+        [TestCase(InsightDirection.Down)]
+        public void SizeSlippageComparisonTests(InsightDirection direction)
         {
-            // A significantly large difference that noise cannot affect the result
-            var smallLiquidOrder = new MarketOrder(_liquidEquity.Symbol, 1, new DateTime(2013, 10, 11, 14, 50, 0));
-            var largeLiquidOrder = new MarketOrder(_liquidEquity.Symbol, 10000000000, new DateTime(2013, 10, 11, 14, 50, 0));
-            var smallIliquidOrder = new MarketOrder(_illiquidEquity.Symbol, 1, new DateTime(2013, 10, 11, 14, 50, 0));
-            var largeIliquidOrder = new MarketOrder(_illiquidEquity.Symbol, 10000000000, new DateTime(2013, 10, 11, 14, 50, 0));
+            // Test on all liquid/illquid stocks/other asset classes
+            foreach (var asset in _securities)
+            {
+                // A significantly large difference that noise cannot affect the result
+                var smallBuyOrder = new MarketOrder(asset.Symbol, 10 * (int)direction, new DateTime(2015, 12, 22, 14, 50, 0));
+                var largeBuyOrder = new MarketOrder(asset.Symbol, 10000000000 * (int)direction, new DateTime(2015, 12, 22, 14, 50, 0));
 
-            var smallLiquidSlippage = _slippageModel.GetSlippageApproximation(_liquidEquity, smallLiquidOrder);
-            var largeLiquidSlippage = _slippageModel.GetSlippageApproximation(_liquidEquity, largeLiquidOrder);
-            var smallIliquidSlippage = _slippageModel.GetSlippageApproximation(_illiquidEquity, smallIliquidOrder);
-            var largeIliquidSlippage = _slippageModel.GetSlippageApproximation(_illiquidEquity, largeIliquidOrder);
+                var smallBuySlippage = _slippageModel.GetSlippageApproximation(asset, smallBuyOrder);
+                var largeBuySlippage = _slippageModel.GetSlippageApproximation(asset, largeBuyOrder);
 
-            // We expect small size order has less slippage than large size order on the same asset
-            Assert.Less(smallLiquidSlippage, largeLiquidSlippage);
-            Assert.Less(smallIliquidSlippage, largeIliquidSlippage);
+                // We expect small size order has less slippage than large size order on the same asset
+                Assert.Less(smallBuySlippage, largeBuySlippage);
+            }
         }
 
         // Order quantity large enough to create significant market impact
+        // Test for buy & sell orders
         [TestCase(1000000)]
+        [TestCase(-1000000)]
         [TestCase(1000000000)]
+        [TestCase(-1000000000)]
         public void LiquiditySlippageComparisonTests(decimal orderQuantity)
         {
-            var liquidOrder = new MarketOrder(_liquidEquity.Symbol, orderQuantity, new DateTime(2013, 10, 11, 14, 50, 0));
-            var illquidOrder = new MarketOrder(_illiquidEquity.Symbol, orderQuantity, new DateTime(2013, 10, 11, 14, 50, 0));
+            var liquidAsset = _securities[0];
+            var illquidAsset = _securities[1];
 
-            var liquidSlippage = _slippageModel.GetSlippageApproximation(_liquidEquity, liquidOrder);
-            var illquidSlippage = _slippageModel.GetSlippageApproximation(_illiquidEquity, illquidOrder);
+            var liquidOrder = new MarketOrder(liquidAsset.Symbol, orderQuantity, new DateTime(2015, 12, 22, 14, 50, 0));
+            var illquidOrder = new MarketOrder(illquidAsset.Symbol, orderQuantity, new DateTime(2015, 12, 22, 14, 50, 0));
+
+            var liquidSlippage = _slippageModel.GetSlippageApproximation(liquidAsset, liquidOrder);
+            var illquidSlippage = _slippageModel.GetSlippageApproximation(illquidAsset, illquidOrder);
 
             // We expect same size order on liquid asset has less slippage than illquid asset
             Assert.Less(liquidSlippage, illquidSlippage);
         }
 
-        // Order quantity large enough to create significant market impact
+        // Test on buy & sell orders
+        [TestCase(100000)]
+        [TestCase(-100000)]
+        public void TimeSlippageComparisonTests(decimal orderQuantity)
+        {
+            // Test on all liquid/illquid stocks/other asset classes
+            foreach (var asset in _securities)
+            {
+                var fastFilledOrder = new MarketOrder(asset.Symbol, orderQuantity, new DateTime(2015, 12, 22, 14, 50, 0));
+                var slowFilledOrder = new MarketOrder(asset.Symbol, orderQuantity, new DateTime(2015, 12, 22, 14, 50, 0));
+                var fastFilledSlippage = _slippageModel.GetSlippageApproximation(asset, fastFilledOrder);
+                var slowFilledSlippage = _slippageModel.GetSlippageApproximation(asset, slowFilledOrder);
+
+                // We expect same size order on same asset has less slippage if filled quicker
+                Assert.Less(fastFilledSlippage, slowFilledSlippage);
+            }
+        }
+
+        // To test whether the slippage matches our expectation
+        [TestCase(100000, 1)]
+        [TestCase(100000, 2)]
+        [TestCase(100000, 3)]
+        [TestCase(100000, 4)]
+        [TestCase(-100000, 1)]
+        [TestCase(-100000, 2)]
+        [TestCase(-100000, 3)]
+        [TestCase(-100000, 4)]
+        [TestCase(100000000, 1)]
+        [TestCase(100000000, 2)]
+        [TestCase(100000000, 3)]
+        [TestCase(100000000, 4)]
+        [TestCase(-100000000, 1)]
+        [TestCase(-100000000, 2)]
+        [TestCase(-100000000, 3)]
+        [TestCase(-100000000, 4)]
+        public void SlippageExpectationTests(decimal orderQuantity, int index, double expected)
+        {
+            var asset = _securities[index];
+            
+            var order = new MarketOrder(asset.Symbol, orderQuantity, new DateTime(2015, 12, 22, 14, 50, 0));
+            var slippage = _slippageModel.GetSlippageApproximation(asset, order);
+
+            Assert.AreEqual(expected, (double)slippage, 0.05d);
+        }
+
+        // Test on buy & sell orders
         [TestCase(1)]
+        [TestCase(-1)]
         [TestCase(1000)]
+        [TestCase(-1000)]
         [TestCase(1000000000)]
+        [TestCase(-1000000000)]
         public void NonNegativeSlippageTests(decimal orderQuantity)
         {
-            var liquidOrder = new MarketOrder(_liquidEquity.Symbol, orderQuantity, new DateTime(2013, 10, 11, 14, 50, 0));
-            var liquidSlippage = _slippageModel.GetSlippageApproximation(_liquidEquity, liquidOrder);
+            // Test on all liquid/illquid stocks/other asset classes
+            foreach (var asset in _securities)
+            {
+                var order = new MarketOrder(asset.Symbol, orderQuantity, new DateTime(2015, 12, 22, 14, 50, 0));
+                var slippage = _slippageModel.GetSlippageApproximation(asset, order);
 
-            Assert.GreaterOrEqual(liquidSlippage, 0m);
-
-            var illquidOrder = new MarketOrder(_illiquidEquity.Symbol, orderQuantity, new DateTime(2013, 10, 11, 14, 50, 0));
-            var illquidSlippage = _slippageModel.GetSlippageApproximation(_illiquidEquity, illquidOrder);
-
-            Assert.GreaterOrEqual(illquidSlippage, 0m);
+                Assert.GreaterOrEqual(slippage, 0m);
+            }
         }
     }
 }

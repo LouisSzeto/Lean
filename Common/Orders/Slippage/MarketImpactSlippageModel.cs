@@ -47,8 +47,8 @@ namespace QuantConnect.Orders.Slippage
         private readonly double _gamma;
         private readonly double _eta;
         private readonly double _delta;
-        private readonly Dictionary<Symbol, SymbolData> _symbolDataPerSymbol = new();
         private readonly Random _random;
+        private SymbolData _symbolData;
 
         /// <summary>
         /// Instantiate a new instance of MarketImpactSlippageModel
@@ -80,34 +80,36 @@ namespace QuantConnect.Orders.Slippage
         /// </summary>
         public decimal GetSlippageApproximation(Security asset, Order order)
         {
-            if (!_symbolDataPerSymbol.TryGetValue(asset.Symbol, out var symbolData))
+            if (_symbolData == null)
             {
-                symbolData = new SymbolData(_algorithm, asset.Symbol);
-                _symbolDataPerSymbol.Add(asset.Symbol, symbolData);
+                _symbolData = new SymbolData(_algorithm, asset.Symbol);
             }
 
-            if (symbolData.AverageVolume == 0d)
+            if (_symbolData.AverageVolume == 0d)
             {
                 return 0m;
             }
 
-            // time taken for execution, we add 700ms to mimic time slippage of filling (convert to by trading day)
-            var time = (_algorithm.UtcTime - order.CreatedTime.AddMilliseconds(700)).TotalDays * 24d / 6.5d;
-            // expected valid time for impact (+ half an hour)
+            // execution time is defined as time difference between submission and filling here, 
+            // with 75ms latency added (https://www.interactivebrokers.com/download/salesPDFs/10-PDF0513.pdf)
+            // it should be in unit of "trading days", so we need to divide by normal trade day's length
+            var normalTradeDayLength = asset.Exchange.Hours.RegularMarketDuration.TotalDays;
+            var time = (_algorithm.UtcTime - order.CreatedTime.AddMilliseconds(75)).TotalDays / normalTradeDayLength;
+            // expected valid time for impact (+ half an hour on the execution time)
             var timePost = time + 1d / 13d;
             // normalized volume of execution
-            var nu = (double)order.AbsoluteQuantity / time / symbolData.AverageVolume;
+            var nu = (double)order.AbsoluteQuantity / time / _symbolData.AverageVolume;
             // liquidity adjustment for temporary market impact, if any
             var liquidityAdjustment = asset.Fundamentals != null ?
-                                      Math.Pow(asset.Fundamentals.CompanyProfile.SharesOutstanding / symbolData.AverageVolume, _delta) :
+                                      Math.Pow(asset.Fundamentals.CompanyProfile.SharesOutstanding / _symbolData.AverageVolume, _delta) :
                                       1d;
             // noise adjustment factor
-            var noise = symbolData.Sigma * Math.Sqrt(timePost);
+            var noise = _symbolData.Sigma * Math.Sqrt(timePost);
 
             // permanent market impact
-            var permanentImpact = symbolData.Sigma * time * G(nu) * liquidityAdjustment + SampleGaussian() * noise;
+            var permanentImpact = _symbolData.Sigma * time * G(nu) * liquidityAdjustment + SampleGaussian() * noise;
             // temporary market impact
-            var temporaryImpact = symbolData.Sigma * H(nu) + SampleGaussian() * noise;
+            var temporaryImpact = _symbolData.Sigma * H(nu) + SampleGaussian() * noise;
             // realized market impact
             var realizedImpact = temporaryImpact + permanentImpact * 0.5d;
 
@@ -189,20 +191,13 @@ namespace QuantConnect.Orders.Slippage
                 .SubscriptionDataConfigService
                 .GetSubscriptionDataConfigs(symbol, includeInternalConfigs: true);
             var configToUse = configs.OrderBy(x => x.TickType).First();
-            var dataTimeZone = configToUse.DataTimeZone;
 
-            var historyRequest = new HistoryRequest(algorithm.UtcTime - TimeSpan.FromDays(370),
-                                                    algorithm.UtcTime,
-                                                    typeof(TradeBar),
-                                                    symbol,
-                                                    Resolution.Daily,
-                                                    algorithm.Securities[symbol].Exchange.Hours,
-                                                    dataTimeZone,
-                                                    Resolution.Daily,
-                                                    false,
-                                                    false,
-                                                    DataNormalizationMode.Adjusted,
-                                                    TickType.Trade);
+            var historyRequestFactory = new HistoryRequestFactory(algorithm);
+            var historyRequest = historyRequestFactory.CreateHistoryRequest(configToUse,
+                                                                            algorithm.Time - TimeSpan.FromDays(370),
+                                                                            algorithm.Time,
+                                                                            algorithm.Securities[symbol].Exchange.Hours,
+                                                                            Resolution.Daily);
             foreach (var bar in algorithm.HistoryProvider.GetHistory(new List<HistoryRequest> { historyRequest }, algorithm.TimeZone))
             {
                 _consolidator.Update(bar.Bars[symbol]);
@@ -230,7 +225,7 @@ namespace QuantConnect.Orders.Slippage
 
             var variance = rocp.Variance();
             Sigma = Math.Sqrt(variance);
-            AverageVolume = (double)_volumes.ToArray().Average();
+            AverageVolume = (double)_volumes.Average();
         }
 
         public void Dispose()
