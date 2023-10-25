@@ -179,6 +179,25 @@ namespace QuantConnect.Tests.Common.Orders.Slippage
             }
         }
 
+        // Test on buy & sell orders
+        [TestCase(10000)]
+        [TestCase(-10000)]
+        [TestCase(1000000000)]
+        [TestCase(-1000000000)]
+        public void MaxSlippageValueTests(decimal orderQuantity)
+        {
+            // Test on all liquid/illquid stocks/other asset classes
+            foreach (var asset in _securities)
+            {
+                var order = new MarketOrder(asset.Symbol, orderQuantity, new DateTime(2015, 6, 10, 14, 00, 0));
+                var slippage = _slippageModel.GetSlippageApproximation(asset, order);
+
+                // Slippage is at max the asset's price
+                Assert.LessOrEqual(slippage, asset.Price);
+                Assert.GreaterOrEqual(slippage, -asset.Price);
+            }
+        }
+
         [Test]
         public void CfdExceptionTests()
         {

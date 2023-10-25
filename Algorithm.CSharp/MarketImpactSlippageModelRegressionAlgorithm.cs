@@ -24,8 +24,6 @@ namespace QuantConnect.Algorithm.CSharp
 {
     public class MarketImpactSlippageModelRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
-        private Security _security;
-
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
         /// </summary>
@@ -33,9 +31,17 @@ namespace QuantConnect.Algorithm.CSharp
         {
             SetStartDate(2013, 10, 07);
             SetEndDate(2013, 10, 13);
+            SetCash(1000000000);
 
-            _security = AddEquity("SPY", Resolution.Minute);
-            _security.SetSlippageModel(new MarketImpactSlippageModel(this));
+            var spy = AddEquity("SPY", Resolution.Daily);
+            var aapl = AddEquity("AAPL", Resolution.Daily);
+            var eem = AddEquity("EEM", Resolution.Daily);
+            var wm = AddEquity("WM", Resolution.Daily);
+
+            spy.SetSlippageModel(new MarketImpactSlippageModel(this));
+            aapl.SetSlippageModel(new MarketImpactSlippageModel(this));
+            eem.SetSlippageModel(new MarketImpactSlippageModel(this));
+            wm.SetSlippageModel(new MarketImpactSlippageModel(this));
 
             SetWarmUp(1);
         }
@@ -46,10 +52,10 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
         public override void OnData(Slice data)
         {
-            if (!Portfolio.Invested)
-            {
-                SetHoldings(_security.Symbol, 1);
-            }
+            SetHoldings("SPY", 0.25);
+            SetHoldings("AAPL", 0.25);
+            SetHoldings("EEM", 0.25);
+            SetHoldings("WM", 0.25);
         }
 
         /// <summary>
@@ -60,7 +66,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (orderEvent.Status == OrderStatus.Filled)
             { 
-                Debug($"Price: {_security.Price}, filled price: {orderEvent.FillPrice}");
+                Debug($"Price: {Securities[orderEvent.Symbol].Price}, filled price: {orderEvent.FillPrice}");
             }
             
         }
