@@ -1,0 +1,151 @@
+/*
+ * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
+ * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+*/
+
+using System;
+using MathNet.Numerics.Distributions;
+using Python.Runtime;
+using QuantConnect.Data;
+
+namespace QuantConnect.Indicators
+{
+    /// <summary>
+    /// Option Rho indicator that calculate the rho of an option
+    /// </summary>
+    /// <remarks>derivative of option price change relative to $1 underlying changes</remarks>
+    public class Rho : OptionGreeksIndicatorBase
+    {
+        /// <summary>
+        /// Initializes a new instance of the Rho class
+        /// </summary>
+        /// <param name="name">The name of this indicator</param>
+        /// <param name="option">The option to be tracked</param>
+        /// <param name="riskFreeRateModel">Risk-free rate model</param>
+        /// <param name="optionModel">The option pricing model used to estimate Rho</param>
+        /// <param name="ivModel">The option pricing model used to estimate IV</param>
+        public Rho(string name, Symbol option, IRiskFreeInterestRateModel riskFreeRateModel,
+                OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes, OptionPricingModelType? ivModel = null)
+            : base(name, option, riskFreeRateModel, optionModel: optionModel, ivModel: ivModel)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the Rho class
+        /// </summary>
+        /// <param name="option">The option to be tracked</param>
+        /// <param name="riskFreeRateModel">Risk-free rate model</param>
+        /// <param name="optionModel">The option pricing model used to estimate Rho</param>
+        /// <param name="ivModel">The option pricing model used to estimate IV</param>
+        public Rho(Symbol option, IRiskFreeInterestRateModel riskFreeRateModel,
+            OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes, OptionPricingModelType? ivModel = null)
+            : this($"Rho({optionModel})", option, riskFreeRateModel, optionModel, ivModel)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the Rho class
+        /// </summary>
+        /// <param name="name">The name of this indicator</param>
+        /// <param name="option">The option to be tracked</param>
+        /// <param name="riskFreeRateModel">Risk-free rate model</param>
+        /// <param name="optionModel">The option pricing model used to estimate Rho</param>
+        /// <param name="ivModel">The option pricing model used to estimate IV</param>
+        public Rho(string name, Symbol option, PyObject riskFreeRateModel,
+            OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes, OptionPricingModelType? ivModel = null)
+            : base(name, option, riskFreeRateModel, optionModel: optionModel, ivModel: ivModel)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the Rho class
+        /// </summary>
+        /// <param name="option">The option to be tracked</param>
+        /// <param name="riskFreeRateModel">Risk-free rate model</param>
+        /// <param name="optionModel">The option pricing model used to estimate Rho</param>
+        /// <param name="ivModel">The option pricing model used to estimate IV</param>
+        public Rho(Symbol option, PyObject riskFreeRateModel, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes,
+            OptionPricingModelType? ivModel = null)
+            : this($"Rho({optionModel})", option, riskFreeRateModel, optionModel, ivModel)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the Rho class
+        /// </summary>
+        /// <param name="option">The option to be tracked</param>am>
+        /// <param name="riskFreeRate">Risk-free rate, as a constant</param>
+        /// <param name="optionModel">The option pricing model used to estimate Rho</param>
+        /// <param name="ivModel">The option pricing model used to estimate IV</param>
+        public Rho(string name, Symbol option, decimal riskFreeRate = 0.05m,
+            OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes, OptionPricingModelType? ivModel = null)
+            : base(name, option, riskFreeRate, optionModel: optionModel, ivModel: ivModel)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the Rho class
+        /// </summary>
+        /// <param name="option">The option to be tracked</param>
+        /// <param name="riskFreeRate">Risk-free rate, as a constant</param>
+        /// <param name="optionModel">The option pricing model used to estimate Rho</param>
+        /// <param name="ivModel">The option pricing model used to estimate IV</param>
+        public Rho(Symbol option, decimal riskFreeRate = 0.05m, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes,
+            OptionPricingModelType? ivModel = null)
+            : this($"Rho({optionModel})", option, riskFreeRate, optionModel, ivModel)
+        {
+        }
+
+        // Calculate the theoretical option rho
+        private decimal TheoreticalRho(decimal spotPrice, decimal timeToExpiration, decimal volatility, 
+            OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes)
+        {
+            var math = OptionGreekIndicatorsHelper.DecimalMath;
+                
+            switch (optionModel)
+            {
+                case OptionPricingModelType.BinomialCoxRossRubinstein:
+                    // finite differencing method with 0.01% risk free rate changes
+                    var deltaR = 0.0001m;
+
+                    var newPrice = OptionGreekIndicatorsHelper.CRRTheoreticalPrice(volatility, spotPrice, Strike, timeToExpiration, RiskFreeRate + deltaR, Right);
+                    var price = OptionGreekIndicatorsHelper.CRRTheoreticalPrice(volatility, spotPrice, Strike, timeToExpiration, RiskFreeRate, Right);
+
+                    return (newPrice - price) / deltaR / 100;
+
+                case OptionPricingModelType.BlackScholes:
+                default:
+                    var norm = new Normal();
+                    var d1 = OptionGreekIndicatorsHelper.CalculateD1(spotPrice, Strike, timeToExpiration, RiskFreeRate, volatility);
+                    var d2 = OptionGreekIndicatorsHelper.CalculateD2(d1, volatility, timeToExpiration);
+                    var discount = math(Math.Exp, -RiskFreeRate * timeToExpiration);
+
+                    if (Right == OptionRight.Call)
+                    {
+                        return Strike * timeToExpiration * discount * math(norm.CumulativeDistribution, d2) / 100m;
+                    }
+                    return -Strike * timeToExpiration * discount * math(norm.CumulativeDistribution, -d2) / 100m;
+            }
+        }
+
+        // Calculate the Rho of the option
+        protected override decimal CalculateGreek(DateTime time)
+        {
+            var spotPrice = UnderlyingPrice.Current.Value;
+            var timeToExpiration = Convert.ToDecimal((Expiry - time).TotalDays) / 365m;
+            var volatility = ImpliedVolatility.Current.Value;
+
+            return TheoreticalRho(spotPrice, timeToExpiration, volatility, _optionModel);
+        }
+    }
+}

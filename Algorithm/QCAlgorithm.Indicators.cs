@@ -1470,6 +1470,31 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Creates a new Rho indicator for the symbol The indicator will be automatically
+        /// updated on the symbol's subscription resolution
+        /// </summary>
+        /// <param name="symbol">The option symbol whose values we want as an indicator</param>
+        /// <param name="riskFreeRate">The risk free rate</param>
+        /// <param name="optionModel">The option pricing model used to estimate rho</param>
+        /// <param name="ivModel">The option pricing model used to estimate IV</param>
+        /// <param name="resolution">The desired resolution of the data</param>
+        /// <returns>A new Rho indicator for the specified symbol</returns>
+        [DocumentationAttribute(Indicators)]
+        public Rho Rho(Symbol symbol, decimal? riskFreeRate = null, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes,
+            OptionPricingModelType? ivModel = null, Resolution? resolution = null)
+        {
+            var name = CreateIndicatorName(symbol, $"Rho({riskFreeRate},{optionModel})", resolution);
+            IRiskFreeInterestRateModel riskFreeRateModel = riskFreeRate.HasValue
+                ? new ConstantRiskFreeRateInterestRateModel(riskFreeRate.Value)
+                // Make it a function so it's lazily evaluated: SetRiskFreeInterestRateModel can be called after this method
+                : new FuncRiskFreeRateInterestRateModel((datetime) => RiskFreeInterestRateModel.GetInterestRate(datetime));
+            var rho = new Rho(name, symbol, riskFreeRateModel, optionModel, ivModel);
+            RegisterIndicator(symbol, rho, ResolveConsolidator(symbol, resolution));
+            RegisterIndicator(symbol.Underlying, rho, ResolveConsolidator(symbol, resolution));
+            return rho;
+        }
+
+        /// <summary>
         /// Creates a new Relative Moving Average indicator for the symbol. The indicator will be automatically updated on the given resolution.
         /// </summary>
         /// <param name="symbol">The symbol whose relative moving average we seek</param>
