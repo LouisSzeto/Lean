@@ -1857,6 +1857,31 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Creates a new Theta indicator for the symbol The indicator will be automatically
+        /// updated on the symbol's subscription resolution
+        /// </summary>
+        /// <param name="symbol">The option symbol whose values we want as an indicator</param>
+        /// <param name="riskFreeRate">The risk free rate</param>
+        /// <param name="optionModel">The option pricing model used to estimate theta</param>
+        /// <param name="ivModel">The option pricing model used to estimate IV</param>
+        /// <param name="resolution">The desired resolution of the data</param>
+        /// <returns>A new Theta indicator for the specified symbol</returns>
+        [DocumentationAttribute(Indicators)]
+        public Theta Theta(Symbol symbol, decimal? riskFreeRate = null, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes,
+            OptionPricingModelType? ivModel = null, Resolution? resolution = null)
+        {
+            var name = CreateIndicatorName(symbol, $"Theta({riskFreeRate},{optionModel})", resolution);
+            IRiskFreeInterestRateModel riskFreeRateModel = riskFreeRate.HasValue
+                ? new ConstantRiskFreeRateInterestRateModel(riskFreeRate.Value)
+                // Make it a function so it's lazily evaluated: SetRiskFreeInterestRateModel can be called after this method
+                : new FuncRiskFreeRateInterestRateModel((datetime) => RiskFreeInterestRateModel.GetInterestRate(datetime));
+            var theta = new Theta(name, symbol, riskFreeRateModel, optionModel, ivModel);
+            RegisterIndicator(symbol, theta, ResolveConsolidator(symbol, resolution));
+            RegisterIndicator(symbol.Underlying, theta, ResolveConsolidator(symbol, resolution));
+            return theta;
+        }
+
+        /// <summary>
         /// Creates a TrueStrengthIndex indicator for the symbol. The indicator will be automatically
         /// updated on the given resolution.
         /// </summary>
