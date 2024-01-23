@@ -738,6 +738,31 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Creates a new Gamma indicator for the symbol The indicator will be automatically
+        /// updated on the symbol's subscription resolution
+        /// </summary>
+        /// <param name="symbol">The option symbol whose values we want as an indicator</param>
+        /// <param name="riskFreeRate">The risk free rate</param>
+        /// <param name="optionModel">The option pricing model used to estimate gamma</param>
+        /// <param name="ivModel">The option pricing model used to estimate IV</param>
+        /// <param name="resolution">The desired resolution of the data</param>
+        /// <returns>A new Gamma indicator for the specified symbol</returns>
+        [DocumentationAttribute(Indicators)]
+        public Gamma Gamma(Symbol symbol, decimal? riskFreeRate = null, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes,
+            OptionPricingModelType? ivModel = null, Resolution? resolution = null)
+        {
+            var name = CreateIndicatorName(symbol, $"Gamma({riskFreeRate},{optionModel})", resolution);
+            IRiskFreeInterestRateModel riskFreeRateModel = riskFreeRate.HasValue
+                ? new ConstantRiskFreeRateInterestRateModel(riskFreeRate.Value)
+                // Make it a function so it's lazily evaluated: SetRiskFreeInterestRateModel can be called after this method
+                : new FuncRiskFreeRateInterestRateModel((datetime) => RiskFreeInterestRateModel.GetInterestRate(datetime));
+            var gamma = new Gamma(name, symbol, riskFreeRateModel, optionModel, ivModel);
+            RegisterIndicator(symbol, gamma, ResolveConsolidator(symbol, resolution));
+            RegisterIndicator(symbol.Underlying, gamma, ResolveConsolidator(symbol, resolution));
+            return gamma;
+        }
+
+        /// <summary>
         /// Creates a new Heikin-Ashi indicator.
         /// </summary>
         /// <param name="symbol">The symbol whose Heikin-Ashi we want</param>
