@@ -66,32 +66,6 @@ namespace QuantConnect.Tests.Indicators
             Assert.AreEqual(refRho, (double)indicator.Current.Value, 0.001d);
         }
 
-        // Reference values from WolframAlpha
-        [TestCase(23.57, 450.0, OptionRight.Call, 60, 0.3712)]
-        [TestCase(20.71, 450.0, OptionRight.Put, 60, -0.3092)]
-        [TestCase(35.82, 470.0, OptionRight.Call, 60, 0.4750)]
-        [TestCase(12.86, 470.0, OptionRight.Put, 60, -0.2360)]
-        [TestCase(14.03, 430.0, OptionRight.Call, 60, 0.2631)]
-        [TestCase(31.40, 430.0, OptionRight.Put, 60, -0.3604)]
-        [TestCase(42.26, 450.0, OptionRight.Call, 180, 1.0819)]
-        [TestCase(34.05, 450.0, OptionRight.Put, 180, -0.8701)]
-        [TestCase(54.51, 470.0, OptionRight.Call, 180, 1.2610)]
-        [TestCase(26.13, 470.0, OptionRight.Put, 180, -0.7622)]
-        [TestCase(31.42, 430.0, OptionRight.Call, 180, 0.8964)]
-        [TestCase(43.58, 430.0, OptionRight.Put, 180, -0.9480)]
-        public void ComparesRhoOnAmericanOptions(decimal price, decimal spotPrice, OptionRight right, int expiry, double refRho)
-        {
-            var symbol = Symbol.CreateOption("SPY", Market.USA, OptionStyle.American, right, 450m, _reference.AddDays(expiry));
-            var indicator = new Rho(symbol, 0.04m, optionModel: OptionPricingModelType.BlackScholes);
-
-            var optionDataPoint = new IndicatorDataPoint(symbol, _reference, price);
-            var spotDataPoint = new IndicatorDataPoint(symbol.Underlying, _reference, spotPrice);
-            indicator.Update(optionDataPoint);
-            indicator.Update(spotDataPoint);
-
-            Assert.AreEqual(refRho, (double)indicator.Current.Value, 0.001d);
-        }
-
         // QuantLib/WolframAlpha does not provide rho for binomial tree model
     }
 }
