@@ -1453,6 +1453,53 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Creates a new Rho indicator for the symbol The indicator will be automatically
+        /// updated on the symbol's subscription resolution
+        /// </summary>
+        /// <param name="symbol">The option symbol whose values we want as an indicator</param>
+        /// <param name="riskFreeRate">The risk free rate</param>
+        /// <param name="dividendYield">The dividend yield</param>
+        /// <param name="optionModel">The option pricing model used to estimate Rho</param>
+        /// <param name="ivModel">The option pricing model used to estimate IV</param>Rho
+        /// <param name="resolution">The desired resolution of the data</param>
+        /// <returns>A new Rho indicator for the specified symbol</returns>
+        [DocumentationAttribute(Indicators)]
+        public Rho R(Symbol symbol, decimal? riskFreeRate = null, decimal? dividendYield = null, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes,
+            OptionPricingModelType? ivModel = null, Resolution? resolution = null)
+        {
+            var name = CreateIndicatorName(symbol, $"Rho({riskFreeRate},{dividendYield},{optionModel},{ivModel})", resolution);
+            IRiskFreeInterestRateModel riskFreeRateModel = riskFreeRate.HasValue
+                ? new ConstantRiskFreeRateInterestRateModel(riskFreeRate.Value)
+                // Make it a function so it's lazily evaluated: SetRiskFreeInterestRateModel can be called after this method
+                : new FuncRiskFreeRateInterestRateModel((datetime) => RiskFreeInterestRateModel.GetInterestRate(datetime));
+            IDividendYieldModel dividendYieldModel = dividendYield.HasValue
+                ? new ConstantDividendYieldModel(dividendYield.Value)
+                : new DividendYieldProvider(symbol.Underlying);
+            var rho = new Rho(name, symbol, riskFreeRateModel, dividendYieldModel, optionModel, ivModel);
+            RegisterIndicator(symbol, rho, ResolveConsolidator(symbol, resolution));
+            RegisterIndicator(symbol.Underlying, rho, ResolveConsolidator(symbol, resolution));
+            return rho;
+        }
+
+        /// <summary>
+        /// Creates a new Rho indicator for the symbol The indicator will be automatically
+        /// updated on the symbol's subscription resolution
+        /// </summary>
+        /// <param name="symbol">The option symbol whose values we want as an indicator</param>
+        /// <param name="riskFreeRate">The risk free rate</param>
+        /// <param name="dividendYield">The dividend yield</param>
+        /// <param name="optionModel">The option pricing model used to estimate Rho</param>
+        /// <param name="ivModel">The option pricing model used to estimate IV</param>
+        /// <param name="resolution">The desired resolution of the data</param>
+        /// <returns>A new Rho indicator for the specified symbol</returns>
+        [DocumentationAttribute(Indicators)]
+        public Rho ρ(Symbol symbol, decimal? riskFreeRate = null, decimal? dividendYield = null, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes,
+            OptionPricingModelType? ivModel = null, Resolution? resolution = null)
+        {
+            return R(symbol, riskFreeRate, dividendYield, optionModel, ivModel, resolution);
+        }
+
+        /// <summary>
         /// Creates a new RegressionChannel indicator which will compute the LinearRegression, UpperChannel and LowerChannel lines, the intercept and slope
         /// </summary>
         /// <param name="symbol">The symbol whose RegressionChannel we seek</param>
