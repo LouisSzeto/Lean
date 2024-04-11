@@ -20,26 +20,26 @@ from AlgorithmImports import *
 ### </summary>
 class TickHistoryRequestWithoutTickSubscriptionRegressionAlgorithm(QCAlgorithm):
 
-    def Initialize(self):
-        self.SetStartDate(2013, 10, 8)
-        self.SetEndDate(2013, 10, 8)
+    def initialize(self):
+        self.set_start_date(2013, 10, 8)
+        self.set_end_date(2013, 10, 8)
 
         # Subscribing SPY and IBM with daily and hour resolution instead of tick resolution
-        spy = self.AddEquity("SPY", Resolution.Daily).Symbol
-        ibm = self.AddEquity("IBM", Resolution.Hour).Symbol
+        spy = self.add_equity("SPY", Resolution.daily).symbol
+        ibm = self.add_equity("IBM", Resolution.hour).symbol
 
         # Requesting history for SPY and IBM (separately) with tick resolution
-        spyHistory = self.History[Tick](spy, timedelta(days=1), Resolution.Tick)
+        spyHistory = self.history[Tick](spy, timedelta(days=1), Resolution.tick)
         if len(list(spyHistory)) == 0:
             raise Exception("SPY tick history is empty")
 
-        ibmHistory = self.History[Tick](ibm, timedelta(days=1), Resolution.Tick)
+        ibmHistory = self.history[Tick](ibm, timedelta(days=1), Resolution.tick)
         if len(list(ibmHistory)) == 0:
             raise Exception("IBM tick history is empty")
 
         # Requesting history for SPY and IBM (together) with tick resolution
-        spyIbmHistory = self.History[Tick]([spy, ibm], timedelta(days=1), Resolution.Tick)
+        spyIbmHistory = self.history[Tick]([spy, ibm], timedelta(days=1), Resolution.tick)
         if len(list(spyIbmHistory)) == 0:
             raise Exception("Compound SPY and IBM tick history is empty")
 
-        self.Quit()
+        self.quit()

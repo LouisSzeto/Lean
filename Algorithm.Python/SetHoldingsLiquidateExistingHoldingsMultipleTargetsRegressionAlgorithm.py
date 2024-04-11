@@ -21,7 +21,7 @@ from SetHoldingsMultipleTargetsRegressionAlgorithm import SetHoldingsMultipleTar
 ### Asserts that liquidateExistingHoldings equal false does not close positions inadvertedly (GH 7008) 
 ### </summary>
 class SetHoldingsLiquidateExistingHoldingsMultipleTargetsRegressionAlgorithm(SetHoldingsMultipleTargetsRegressionAlgorithm):
-    def OnData(self, data):
-        if not self.Portfolio.Invested:
-            self.SetHoldings([PortfolioTarget(self._spy, 0.8), PortfolioTarget(self._ibm, 0.2)],
+    def on_data(self, data):
+        if not self.portfolio.invested:
+            self.set_holdings([PortfolioTarget(self._spy, 0.8), PortfolioTarget(self._ibm, 0.2)],
                              liquidateExistingHoldings=True)

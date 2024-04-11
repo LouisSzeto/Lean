@@ -15,39 +15,39 @@ from AlgorithmImports import *
 
 ### <summary>
 ### This regression algorithm has examples of how to add an equity indicating the <see cref="DataNormalizationMode"/>
-### directly with the <see cref="QCAlgorithm.AddEquity"/> method instead of using the <see cref="Equity.SetDataNormalizationMode"/> method.
+### directly with the <see cref="QCAlgorithm.add_equity"/> method instead of using the <see cref="Equity.set_data_normalization_mode"/> method.
 ### </summary>
 class SetEquityDataNormalizationModeOnAddEquity(QCAlgorithm):
-    def Initialize(self):
-        self.SetStartDate(2013, 10, 7)
-        self.SetEndDate(2013, 10, 7)
+    def initialize(self):
+        self.set_start_date(2013, 10, 7)
+        self.set_end_date(2013, 10, 7)
 
-        spyNormalizationMode = DataNormalizationMode.Raw
-        ibmNormalizationMode = DataNormalizationMode.Adjusted
-        aigNormalizationMode = DataNormalizationMode.TotalReturn
+        spyNormalizationMode = DataNormalizationMode.raw
+        ibmNormalizationMode = DataNormalizationMode.adjusted
+        aigNormalizationMode = DataNormalizationMode.total_return
 
-        self._priceRanges = {}
+        self._price_ranges = {}
 
-        spyEquity = self.AddEquity("SPY", Resolution.Minute, dataNormalizationMode=spyNormalizationMode)
-        self.CheckEquityDataNormalizationMode(spyEquity, spyNormalizationMode)
-        self._priceRanges[spyEquity] = (167.28, 168.37)
+        spyEquity = self.add_equity("SPY", Resolution.MINUTE, dataNormalizationMode=spyNormalizationMode)
+        self.check_equity_data_normalization_mode(spyEquity, spyNormalizationMode)
+        self._price_ranges[spyEquity] = (167.28, 168.37)
 
-        ibmEquity = self.AddEquity("IBM", Resolution.Minute, dataNormalizationMode=ibmNormalizationMode)
-        self.CheckEquityDataNormalizationMode(ibmEquity, ibmNormalizationMode)
-        self._priceRanges[ibmEquity] = (135.864131052, 136.819606508)
+        ibmEquity = self.add_equity("IBM", Resolution.MINUTE, dataNormalizationMode=ibmNormalizationMode)
+        self.check_equity_data_normalization_mode(ibmEquity, ibmNormalizationMode)
+        self._price_ranges[ibmEquity] = (135.864131052, 136.819606508)
 
-        aigEquity = self.AddEquity("AIG", Resolution.Minute, dataNormalizationMode=aigNormalizationMode)
-        self.CheckEquityDataNormalizationMode(aigEquity, aigNormalizationMode)
-        self._priceRanges[aigEquity] = (48.73, 49.10)
+        aigEquity = self.add_equity("AIG", Resolution.MINUTE, dataNormalizationMode=aigNormalizationMode)
+        self.check_equity_data_normalization_mode(aigEquity, aigNormalizationMode)
+        self._price_ranges[aigEquity] = (48.73, 49.10)
 
-    def OnData(self, slice):
-        for equity, (minExpectedPrice, maxExpectedPrice) in self._priceRanges.items():
-            if equity.HasData and (equity.Price < minExpectedPrice or equity.Price > maxExpectedPrice):
-                raise Exception(f"{equity.Symbol}: Price {equity.Price} is out of expected range [{minExpectedPrice}, {maxExpectedPrice}]")
+    def on_data(self, slice):
+        for equity, (minExpectedPrice, maxExpectedPrice) in self._price_ranges.items():
+            if equity.has_data and (equity.price < minExpectedPrice or equity.price > maxExpectedPrice):
+                raise Exception(f"{equity.symbol}: Price {equity.price} is out of expected range [{minExpectedPrice}, {maxExpectedPrice}]")
 
-    def CheckEquityDataNormalizationMode(self, equity, expectedNormalizationMode):
-        subscriptions = [x for x in self.SubscriptionManager.Subscriptions if x.Symbol == equity.Symbol]
-        if any([x.DataNormalizationMode != expectedNormalizationMode for x in subscriptions]):
-            raise Exception(f"Expected {equity.Symbol} to have data normalization mode {expectedNormalizationMode} but was {subscriptions[0].DataNormalizationMode}")
+    def check_equity_data_normalization_mode(self, equity, expectedNormalizationMode):
+        subscriptions = [x for x in self.subscription_manager.subscriptions if x.symbol == equity.symbol]
+        if any([x.data_normalization_mode != expectedNormalizationMode for x in subscriptions]):
+            raise Exception(f"Expected {equity.symbol} to have data normalization mode {expectedNormalizationMode} but was {subscriptions[0].data_normalization_mode}")
 
 
