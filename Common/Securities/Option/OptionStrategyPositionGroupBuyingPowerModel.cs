@@ -122,12 +122,33 @@ namespace QuantConnect.Securities.Option
             else if (_optionStrategy.Name == OptionStrategyDefinitions.NakedCall.Name
                 || _optionStrategy.Name == OptionStrategyDefinitions.NakedPut.Name)
             {
-                var option = parameters.PositionGroup.Positions.Single();
-                var security = (Option)parameters.Portfolio.Securities[option.Symbol];
-                var margin = security.BuyingPowerModel.GetMaintenanceMargin(MaintenanceMarginParameters.ForQuantityAtCurrentPrice(security,
-                    option.Quantity));
+                // Options:
+                // Call/Put Price + Maximum((20% * Underlying Price - Out of the Money Amount), (10% * Underlying Price))
+                // Index Options:
+                // Call/Put Price + Maximum((15% * Underlying Price - Out of the Money Amount), (10% * Underlying Price))
+                var optionPosition = parameters.PositionGroup.Positions.Single();
+                var security = parameters.Portfolio.Securities[optionPosition.Symbol];
+                if (security.Holdings.Quantity > 0)
+                {
+                    return 0m;
+                }
 
-                return new MaintenanceMargin(margin);
+                var underlyingSecurity = parameters.Portfolio.Securities[optionPosition.Symbol.Underlying];
+                var underlyingRatio = 0.2m;
+                if (security.Type == SecurityType.IndexOption)
+                {
+                    underlyingRatio = 0.15m;
+                }
+
+                var underlyingPrice = underlyingSecurity.Price;
+                var optionSecurity = (Option)security;
+                var outOfTheMoneyValue = optionSecurity.OutOfTheMoneyAmount(underlyingSecurity.Price);
+
+                var result = optionSecurity.Price + Math.Max(underlyingRatio * underlyingPrice - outOfTheMoneyValue, 0.1m * underlyingPrice);
+                result = result * optionSecurity.ContractUnitOfTrade * Math.Abs(optionPosition.Quantity);
+                var inAccountCurrency = parameters.Portfolio.CashBook.ConvertToAccountCurrency(result, optionSecurity.QuoteCurrency.Symbol);
+
+                return new MaintenanceMargin(inAccountCurrency);
             }
             else if (_optionStrategy.Name == OptionStrategyDefinitions.BearCallSpread.Name
                 || _optionStrategy.Name == OptionStrategyDefinitions.BullCallSpread.Name)
@@ -143,12 +164,7 @@ namespace QuantConnect.Securities.Option
             else if (_optionStrategy.Name == OptionStrategyDefinitions.ShortCallCalendarSpread.Name
                 || _optionStrategy.Name == OptionStrategyDefinitions.ShortPutCalendarSpread.Name)
             {
-                var shortCall = parameters.PositionGroup.Positions.Single(position => position.Quantity < 0);
-                var shortCallSecurity = (Option)parameters.Portfolio.Securities[shortCall.Symbol];
-                var result = shortCallSecurity.BuyingPowerModel.GetMaintenanceMargin(MaintenanceMarginParameters.ForQuantityAtCurrentPrice(
-                    shortCallSecurity, shortCall.Quantity));
-
-                return new MaintenanceMargin(result);
+                return new MaintenanceMargin(0);
             }
             else if (_optionStrategy.Name == OptionStrategyDefinitions.BearPutSpread.Name
                 || _optionStrategy.Name == OptionStrategyDefinitions.BullPutSpread.Name)
@@ -231,17 +247,7 @@ namespace QuantConnect.Securities.Option
             else if (_optionStrategy.Name == OptionStrategyDefinitions.NakedCall.Name
                 || _optionStrategy.Name == OptionStrategyDefinitions.NakedPut.Name)
             {
-                var option = parameters.PositionGroup.Positions.Single();
-                var security = (Option)parameters.Portfolio.Securities[option.Symbol];
-                var margin = security.BuyingPowerModel.GetInitialMarginRequirement(new InitialMarginParameters(security, option.Quantity));
-                var optionMargin = margin as OptionInitialMargin;
-
-                if (optionMargin != null)
-                {
-                    return new OptionInitialMargin(Math.Abs(optionMargin.ValueWithoutPremium), optionMargin.Premium);
-                }
-
-                return margin;
+                GetMaintenanceMargin(new PositionGroupMaintenanceMarginParameters(parameters.Portfolio, parameters.PositionGroup));
             }
             else if (_optionStrategy.Name == OptionStrategyDefinitions.BearCallSpread.Name
                 || _optionStrategy.Name == OptionStrategyDefinitions.BullCallSpread.Name)
@@ -256,9 +262,7 @@ namespace QuantConnect.Securities.Option
             else if (_optionStrategy.Name == OptionStrategyDefinitions.ShortCallCalendarSpread.Name
                 || _optionStrategy.Name == OptionStrategyDefinitions.ShortPutCalendarSpread.Name)
             {
-                var shortOptionPosition = parameters.PositionGroup.Positions.Single(position => position.Quantity < 0);
-                var shortOption = (Option)parameters.Portfolio.Securities[shortOptionPosition.Symbol];
-                result = Math.Abs(shortOption.BuyingPowerModel.GetInitialMarginRequirement(shortOption, shortOptionPosition.Quantity));
+                result = 0m;
             }
             else if (_optionStrategy.Name == OptionStrategyDefinitions.BearPutSpread.Name
                 || _optionStrategy.Name == OptionStrategyDefinitions.BullPutSpread.Name)

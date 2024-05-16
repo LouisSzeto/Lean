@@ -69,18 +69,18 @@ namespace QuantConnect.Tests.Common.Securities
         // option strategy definition, initial quantity, order quantity, expected result
         private static readonly TestCaseData[] HasSufficientBuyingPowerForOrderTestCases = new[]
         {
-            // Initial margin requirement|premium for NakedCall with quantities 1 and -1 are 19400|0 and 0|11200 respectively
-            new TestCaseData(OptionStrategyDefinitions.NakedCall, 0, (1000000 - 0 * 19400) / (19400 + 0), true), // 0 to max long
-            new TestCaseData(OptionStrategyDefinitions.NakedCall, 0, (1000000 - 0 * 19400) / (19400 + 0) + 1, false), // 0 to max long + 1
+            // Initial margin requirement|premium for NakedCall with quantities 1 and -1 are 15300|0 and 0|11200 respectively
+            new TestCaseData(OptionStrategyDefinitions.NakedCall, 0, (1000000 - 0 * 15300) / (15300 + 0), true), // 0 to max long
+            new TestCaseData(OptionStrategyDefinitions.NakedCall, 0, (1000000 - 0 * 15300) / (15300 + 0) + 1, false), // 0 to max long + 1
             new TestCaseData(OptionStrategyDefinitions.NakedCall, 0, -(1000000 + 0 * 0) / (0 + 11200), true), // 0 to max short
             new TestCaseData(OptionStrategyDefinitions.NakedCall, 0, -(1000000 + 0 * 0) / (0 + 11200) - 1, false),    // 0 to max short + 1
-            new TestCaseData(OptionStrategyDefinitions.NakedCall, 20, (1000000 - 20 * 19400) / (19400 + 0), true),    // 20 to max long
-            new TestCaseData(OptionStrategyDefinitions.NakedCall, 20, (1000000 - 20 * 19400) / (19400 + 0) + 1, false),    // 20 to max long + 1
+            new TestCaseData(OptionStrategyDefinitions.NakedCall, 20, (1000000 - 20 * 15300) / (15300 + 0), true),    // 20 to max long
+            new TestCaseData(OptionStrategyDefinitions.NakedCall, 20, (1000000 - 20 * 15300) / (15300 + 0) + 1, false),    // 20 to max long + 1
             new TestCaseData(OptionStrategyDefinitions.NakedCall, 20, -20, true), // 20 to 0
             new TestCaseData(OptionStrategyDefinitions.NakedCall, 20, -(1000000 + 20 * 0) / (0 + 11200), true), // 20 to max short
             new TestCaseData(OptionStrategyDefinitions.NakedCall, 20, -(1000000 + 20 * 0) / (0 + 11200) - 1, false),  // 20 to max short + 1
-            new TestCaseData(OptionStrategyDefinitions.NakedCall, -20, (1000000 + 20 * 19400) / (19400 + 0), true),   // -20 to max long
-            new TestCaseData(OptionStrategyDefinitions.NakedCall, -20, (1000000 + 20 * 19400) / (19400 + 0) + 1, false),   // -20 to max long + 1
+            new TestCaseData(OptionStrategyDefinitions.NakedCall, -20, (1000000 + 20 * 15300) / (15300 + 0), true),   // -20 to max long
+            new TestCaseData(OptionStrategyDefinitions.NakedCall, -20, (1000000 + 20 * 15300) / (15300 + 0) + 1, false),   // -20 to max long + 1
             new TestCaseData(OptionStrategyDefinitions.NakedCall, -20, 20, true), // -20 to 0
             new TestCaseData(OptionStrategyDefinitions.NakedCall, -20, -(1000000 - 20 * 0) / (0 + 11200), true),    // -20 to max short
             new TestCaseData(OptionStrategyDefinitions.NakedCall, -20, -(1000000 - 20 * 0) / (0 + 11200) - 1, false),  // -20 to max short + 1
