@@ -246,6 +246,52 @@ namespace QuantConnect.Securities.Option
 
                 return new MaintenanceMargin(inAccountCurrency);
             }
+            else if (_optionStrategy.Name == OptionStrategyDefinitions.BearCallLadder.Name)
+            {
+                // Bear Call Ladder = Bear Call Spread of 2 lower strike prices + Long Naked Call with the highest strike price (margin: 0)
+                var callSpread = parameters.PositionGroup.Positions.OrderBy(position => position.Symbol.ID.StrikePrice).Take(2).ToList();
+                var shortCallSecurity = (Option)parameters.Portfolio.Securities[callSpread[0].Symbol];
+                var multiplier = Math.Abs(callSpread[0].Quantity) * shortCallSecurity.ContractUnitOfTrade;
+
+                var strikeDifference = callSpread[1].Symbol.ID.StrikePrice - callSpread[0].Symbol.ID.StrikePrice;
+                var result = strikeDifference * multiplier;
+                var inAccountCurrency = parameters.Portfolio.CashBook.ConvertToAccountCurrency(result, shortCallSecurity.QuoteCurrency.Symbol);
+
+                return new MaintenanceMargin(result);
+            }
+            else if (_optionStrategy.Name == OptionStrategyDefinitions.BearPutLadder.Name)
+            {
+                // Bear Put Ladder = Bear Put Spread of 2 lower strike prices (margin: 0) + Short Naked Put with the highest strike price
+                var shortNakedPut = parameters.PositionGroup.Positions.OrderBy(position => position.Symbol.ID.StrikePrice).First();
+                var shortNakedPutSecurity = (Option)parameters.Portfolio.Securities[shortNakedPut.Symbol];
+                var result = shortNakedPutSecurity.BuyingPowerModel.GetMaintenanceMargin(MaintenanceMarginParameters.ForQuantityAtCurrentPrice(
+                    shortNakedPutSecurity, shortNakedPut.Quantity));
+
+                return new MaintenanceMargin(result);
+            }
+            else if (_optionStrategy.Name == OptionStrategyDefinitions.BullCallLadder.Name)
+            {
+                // Bull Call Ladder = Bull Call Spread of 2 lower strike prices (margin: 0) + Short Naked Call with the highest strike price
+                var shortNakedCall = parameters.PositionGroup.Positions.OrderByDescending(position => position.Symbol.ID.StrikePrice).First();
+                var shortNakedCallSecurity = (Option)parameters.Portfolio.Securities[shortNakedCall.Symbol];
+                var result = shortNakedCallSecurity.BuyingPowerModel.GetMaintenanceMargin(MaintenanceMarginParameters.ForQuantityAtCurrentPrice(
+                    shortNakedCallSecurity, shortNakedCall.Quantity));
+
+                return new MaintenanceMargin(result);
+            }
+            else if (_optionStrategy.Name == OptionStrategyDefinitions.BullPutLadder.Name)
+            {
+                // Bull Put Ladder = Bull Put Spread of 2 lower strike prices + Long Naked Put with the lowest strike price (margin: 0)
+                var putSpread = parameters.PositionGroup.Positions.OrderByDescending(position => position.Symbol.ID.StrikePrice).Take(2).ToList();
+                var shortPutSecurity = (Option)parameters.Portfolio.Securities[putSpread[1].Symbol];
+                var multiplier = Math.Abs(putSpread[1].Quantity) * shortPutSecurity.ContractUnitOfTrade;
+
+                var strikeDifference = putSpread[0].Symbol.ID.StrikePrice - putSpread[1].Symbol.ID.StrikePrice;
+                var result = strikeDifference * multiplier;
+                var inAccountCurrency = parameters.Portfolio.CashBook.ConvertToAccountCurrency(result, shortPutSecurity.QuoteCurrency.Symbol);
+
+                return new MaintenanceMargin(result);
+            }
 
             throw new NotImplementedException($"Option strategy {_optionStrategy.Name} margin modeling has yet to be implemented");
         }
@@ -364,6 +410,11 @@ namespace QuantConnect.Securities.Option
                 result = 0m;
             }
             else if (_optionStrategy.Name == OptionStrategyDefinitions.ShortBoxSpread.Name)
+            {
+                result = GetMaintenanceMargin(new PositionGroupMaintenanceMarginParameters(parameters.Portfolio, parameters.PositionGroup));
+            }
+            else if (_optionStrategy.Name == OptionStrategyDefinitions.BearCallLadder.Name || _optionStrategy.Name == OptionStrategyDefinitions.BearPutLadder.Name
+                || _optionStrategy.Name == OptionStrategyDefinitions.BullCallLadder.Name || _optionStrategy.Name == OptionStrategyDefinitions.BullPutLadder.Name)
             {
                 result = GetMaintenanceMargin(new PositionGroupMaintenanceMarginParameters(parameters.Portfolio, parameters.PositionGroup));
             }
