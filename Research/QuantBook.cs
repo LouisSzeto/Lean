@@ -50,6 +50,8 @@ namespace QuantConnect.Research
         private IDataProvider _dataProvider;
         private static bool _isPythonNotebook;
 
+        public Report Report { get; private set; }
+
         static QuantBook()
         {
             //Determine if we are in a Python Notebook
@@ -203,6 +205,8 @@ namespace QuantConnect.Research
 
                 SetAlgorithmMode(AlgorithmMode.Research);
                 SetDeploymentTarget(Config.GetValue("deployment-target", DeploymentTarget.LocalPlatform));
+
+                Report = new Report(this);
             }
             catch (Exception exception)
             {
