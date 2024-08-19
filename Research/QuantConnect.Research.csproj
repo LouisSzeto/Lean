@@ -70,5 +70,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <PackageCopyToOutput>true</PackageCopyToOutput>
     </Content>
+    <Content Include="Reports\PerformanceRelativeToRiskFactors.py" />
   </ItemGroup>
 </Project>
