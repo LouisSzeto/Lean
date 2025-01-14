@@ -3740,6 +3740,27 @@ namespace QuantConnect
         }
 
         /// <summary>
+        /// Helper method to determine the right data mapping mode to use by default
+        /// </summary>
+        public static DataMappingMode GetUniverseNormalizationModeOrDefault(this UniverseSettings universeSettings, SecurityType securityType, string market)
+        {
+            switch (securityType)
+            {
+                case SecurityType.Future:
+                    if ((universeSettings.DataMappingMode == DataMappingMode.OpenInterest
+                        || universeSettings.DataMappingMode == DataMappingMode.OpenInterestAnnual)
+                        && (market == Market.HKFE || market == Market.EUREX || market == Market.ICE))
+                    {
+                        // circle around default OI for currently no OI available data
+                        return DataMappingMode.LastTradingDay;
+                    }
+                    return universeSettings.DataMappingMode;
+                default:
+                    return universeSettings.DataMappingMode;
+            }
+        }
+
+        /// <summary>
         /// Helper method to determine the right data normalization mode to use by default
         /// </summary>
         public static DataNormalizationMode GetUniverseNormalizationModeOrDefault(this UniverseSettings universeSettings, SecurityType securityType)
@@ -3824,10 +3845,15 @@ namespace QuantConnect
         {
             foreach (var security in securityChanges.AddedSecurities)
             {
-                security.IsTradable = true;
-
                 // uses TryAdd, so don't need to worry about duplicates here
                 algorithm.Securities.Add(security);
+
+                if (security.Type == SecurityType.Index && !(security as Securities.Index.Index).ManualSetIsTradable)
+                {
+                    continue;
+                }
+
+                security.IsTradable = true;
             }
 
             var activeSecurities = algorithm.UniverseManager.ActiveSecurities;
@@ -4376,9 +4402,14 @@ namespace QuantConnect
             }
         }
 
+        /// <summary>
+        /// Retrieve a common custom data types from the given symbols if any
+        /// </summary>
+        /// <param name="symbols">The target symbols to search</param>
+        /// <returns>The custom data type or null</returns>
         public static Type GetCustomDataTypeFromSymbols(Symbol[] symbols)
         {
-            if (symbols.Any())
+            if (symbols.Length != 0)
             {
                 if (!SecurityIdentifier.TryGetCustomDataTypeInstance(symbols[0].ID.Symbol, out var dataType)
                     || symbols.Any(x => !SecurityIdentifier.TryGetCustomDataTypeInstance(x.ID.Symbol, out var customDataType) || customDataType != dataType))
